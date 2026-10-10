@@ -6,6 +6,8 @@ A round now-playing display. It shows the cover of whatever is playing on Spotif
 
 ![states](docs/screens.png)
 
+![network states](docs/states.png)
+
 The shots above come from the simulator, which runs the same renderer as the board. Top row: playing, a long title, paused. Bottom row: another song, nothing playing, offline.
 
 ## How it works
