@@ -19,6 +19,13 @@ The shots above come from the simulator, which runs the same renderer as the boa
 
 On the board: about 2.5 ms of drawing per frame, internal heap steady near 190 KB, no display errors over a long run.
 
+## Controls and status
+
+- Tap wakes a dimmed screen. It dims after 90 s with nothing playing.
+- Long press asks the site again right away, and the screen flashes up once.
+- The Wi-Fi icon under the footer: green is joined and reaching the site, amber is joined but the site is not answering (`NO INTERNET`), one arc is still joining, a red dot is no network (`NO WI-FI`).
+- If polls keep failing while the board thinks it is joined, it drops the link and rejoins, at most once every 30 s. Campus access points can end a session without telling the client.
+
 ## Layout
 
 | Path | What |
