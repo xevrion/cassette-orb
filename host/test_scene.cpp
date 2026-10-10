@@ -233,6 +233,27 @@ static void test_each_state_looks_different() {
     CHECK(differing(online_paused, error, &first) > 50, "paused and no signal look different");
 }
 
+// The Wi-Fi icon tells the four network states apart at a glance.
+static void test_wifi_icon() {
+    auto icon = [](Link link) {
+        Deck d;
+        d.set_link(link);
+        return paint(d, 0.2f);
+    };
+    // The top of the outer arc sits straight above the dot, 26 pixels up (dot at y 436).
+    const int top = 436 - 26, mid = 436 - 18, dot = 436;
+    const auto online = icon(Link::Online), amber = icon(Link::Error), joining = icon(Link::Connecting), down = icon(Link::Offline);
+    CHECK(hue_at(online, 233, top) == Hue::Other && ((online[top * kScreen + 233] >> 5) & 0x3F) > 40, "online lights the outer arc green");
+    CHECK(online[mid * kScreen + 233] == online[top * kScreen + 233], "all three arcs share the colour when online");
+    CHECK(amber[top * kScreen + 233] != online[top * kScreen + 233], "no internet is not drawn in the online colour");
+    CHECK(amber[top * kScreen + 233] != down[top * kScreen + 233], "and not in the down colour either");
+    CHECK(joining[mid * kScreen + 233] == joining[436 * kScreen + 233] || joining[dot * kScreen + 233] != 0, "joining shows the dot");
+    CHECK(joining[top * kScreen + 233] != joining[dot * kScreen + 233], "joining lights only the inner arc, the outer one stays faint");
+    CHECK(down[top * kScreen + 233] != down[dot * kScreen + 233], "with no network only the dot is lit, in red");
+    CHECK(down[dot * kScreen + 233] != online[dot * kScreen + 233], "red dot against green dot");
+    CHECK(brightness(down, 233, top) > 0, "the faint outline is still there");
+}
+
 // "Quick" as a number. While a song plays, each frame touches only the equalizer and any line that
 // is scrolling, a tiny part of the screen. The cover is never resent.
 static void test_playing_frames_are_tiny() {
@@ -359,6 +380,7 @@ int main() {
     test_paused_cover_is_dimmer();
     test_glow_and_ring();
     test_each_state_looks_different();
+    test_wifi_icon();
     test_playing_frames_are_tiny();
     test_short_title_only_moves_the_bars();
     test_paused_is_silent();

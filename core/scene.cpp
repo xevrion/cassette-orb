@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "rk/font.hpp"
 
@@ -25,6 +26,7 @@ constexpr int kLineScale[3] = {3, 2, 2};
 constexpr int kLineX0[3] = {50, 70, 70};
 constexpr int kLineX1[3] = {416, 396, 396};
 constexpr int kFooterY = 372, kFooterH = 28;
+constexpr int kWifiY = 436;  // the dot of the Wi-Fi icon
 constexpr int kBarW = 10, kBarGap = 6, kBarStep = 3;
 
 uint16_t scaled(uint16_t c, float k) {
@@ -167,9 +169,9 @@ void Scene::paint_footer(Surface& sf, const Deck& d) {
     const char* word = "";
     uint16_t colour = kGrey;
     switch (d.link()) {
-    case Link::Offline: word = "OFFLINE", colour = rgb565(235, 85, 85); break;
+    case Link::Offline: word = "NO WI-FI", colour = rgb565(235, 85, 85); break;
     case Link::Connecting: word = "CONNECTING...", colour = rgb565(130, 150, 190); break;
-    case Link::Error: word = "NO SIGNAL", colour = rgb565(235, 85, 85); break;
+    case Link::Error: word = "NO INTERNET", colour = rgb565(235, 170, 50); break;
     case Link::Online:
         if (d.playing()) break;
         word = d.track().known ? "PAUSED" : "";
@@ -194,6 +196,33 @@ void Scene::paint_footer(Surface& sf, const Deck& d) {
     }
 }
 
+// The classic Wi-Fi fan under the footer. Green means joined and reaching the site, amber means
+// joined but the site is not answering, one grey-blue arc means still joining, a red dot means
+// no network at all. Unlit arcs stay as a faint outline so the shape is always readable.
+void Scene::paint_wifi(Surface& sf, const Deck& d) {
+    uint16_t lit = kGrey;
+    int arcs = 0;
+    switch (d.link()) {
+    case Link::Online: lit = rgb565(60, 190, 110), arcs = 3; break;
+    case Link::Error: lit = rgb565(235, 170, 50), arcs = 3; break;
+    case Link::Connecting: lit = rgb565(130, 150, 190), arcs = 1; break;
+    case Link::Offline: lit = rgb565(235, 85, 85), arcs = 0; break;
+    }
+    constexpr int cx = 233, cy = kWifiY;
+    constexpr int radii[3] = {10, 18, 26};
+    for (int a = 0; a < 3; ++a) {
+        const int r = radii[a];
+        const uint16_t c = a < arcs ? lit : rgb565(40, 42, 50);
+        const int lo = (r - 1) * (r - 1), hi = (r + 2) * (r + 2);
+        for (int dy = -r - 2; dy <= -3; ++dy)
+            for (int dx = -r - 2; dx <= r + 2; ++dx) {
+                const int dist = dx * dx + dy * dy;
+                if (dist >= lo && dist < hi && -dy >= std::abs(dx)) sf.fill_rect(cx + dx, cy + dy, 1, 1, c);
+            }
+    }
+    fill_disc(sf, cx, cy, 3, lit);
+}
+
 void Scene::repaint_all(Surface& sf, const Deck& d) {
     sf.fill_rect(0, 0, kScreen, kScreen, kBlack);
     paint_ring(sf, d);
@@ -201,6 +230,7 @@ void Scene::repaint_all(Surface& sf, const Deck& d) {
     paint_cover(sf, d);
     for (int i = 0; i < kLines; ++i) paint_line(sf, d, i);
     paint_footer(sf, d);
+    paint_wifi(sf, d);
 }
 
 void Scene::draw(Surface& sf, const Deck& d) {
