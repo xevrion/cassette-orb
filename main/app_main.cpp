@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 #include "poller.hpp"
 #include "rk/display_lock.hpp"
+#include "rk/gesture.hpp"
 #include "rk/panel.hpp"
 #include "scene.hpp"
 #include "wifi.hpp"
@@ -21,6 +22,8 @@ constexpr int kFrameMs = 16;
 constexpr int kBright = 70;       // percent while music is on
 constexpr int kDim = 10;          // percent after the music has been off for a while
 constexpr int kDimAfterS = 90;
+constexpr int kTouchWakeS = 30;   // a tap keeps the screen bright this long
+constexpr int kBlinkFrames = 10;  // full brightness for this many frames when a refresh is asked for
 
 // How many times LVGL actually refreshed the panel, and how long each took, so "smooth" is a number.
 static int64_t g_refresh_start = 0, g_refresh_total = 0;
@@ -77,6 +80,9 @@ extern "C" void app_main() {
     int quiet_frames = 0;
     int level = kBright;
     int frame = 0;
+    lv_indev_t* touch = bsp_display_get_input_dev();
+    rk::Gesture gesture;
+    int awake_frames = 0, blink = 0;
     int64_t draw_sum = 0, draw_max = 0;
     int draw_n = 0, presented = 0;
 
@@ -149,9 +155,29 @@ extern "C" void app_main() {
             draw_max = spent > draw_max ? spent : draw_max;
         }
 
+        // A tap wakes a dimmed screen. A long press asks the site again right now, and the screen
+        // flashes up once so you know it heard you.
+        bool pressed = false;
+        lv_point_t point = {0, 0};
+        if (touch) {
+            rk::DisplayLock lock;
+            pressed = lv_indev_get_state(touch) == LV_INDEV_STATE_PRESSED;
+            lv_indev_get_point(touch, &point);
+        }
+        const rk::Tap tap = gesture.update(pressed, point.x, point.y, dt);
+        if (pressed || tap == rk::Tap::Short) awake_frames = kTouchWakeS * 1000 / kFrameMs;
+        if (tap == rk::Tap::Long) {
+            poller.poke();
+            blink = kBlinkFrames;
+            awake_frames = kTouchWakeS * 1000 / kFrameMs;
+        }
+        if (awake_frames > 0) --awake_frames;
+        if (blink > 0) --blink;
+
         // Dim the screen when nothing has been playing for a while, and wake it with the music.
         quiet_frames = deck.playing() ? 0 : quiet_frames + 1;
-        const int want = quiet_frames * kFrameMs / 1000 > kDimAfterS ? kDim : kBright;
+        int want = quiet_frames * kFrameMs / 1000 > kDimAfterS && awake_frames == 0 ? kDim : kBright;
+        if (blink > 0) want = 100;
         if (want != level) {
             level = want;
             bsp_display_brightness_set(level);
