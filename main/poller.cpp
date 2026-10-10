@@ -9,6 +9,7 @@
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "nowplaying.hpp"
 #include "timesync.hpp"
 
@@ -63,7 +64,11 @@ int http_get(const char* url, uint8_t* buf, size_t cap, int timeout_ms) {
 Poller::Poller(Wifi& wifi) : wifi_(wifi), lock_(xSemaphoreCreateMutex()) {}
 
 // The stack lives in PSRAM: the TLS handshake wants a big one, and internal RAM is what the display needs.
-void Poller::start() { xTaskCreateWithCaps(entry, "poller", 16384, this, 4, nullptr, MALLOC_CAP_SPIRAM); }
+void Poller::start() { xTaskCreateWithCaps(entry, "poller", 16384, this, 4, &task_, MALLOC_CAP_SPIRAM); }
+
+void Poller::poke() {
+    if (task_) xTaskNotifyGive(task_);
+}
 
 void Poller::entry(void* self) { static_cast<Poller*>(self)->run(); }
 
@@ -115,6 +120,7 @@ void Poller::run() {
 
     bool have_clock = false;
     int fails = 0;
+    int64_t last_rejoin_us = -60'000'000;
     uint32_t art_done_for = 0;
     uint32_t art_tries_for = 0;
     int art_tries = 0;
@@ -171,14 +177,21 @@ void Poller::run() {
             ESP_LOGI(TAG, "%s: %s - %s", track.known ? (playing ? "playing" : "paused") : "nothing", track.title, track.artist);
         } else {
             ++fails;
-            ESP_LOGW(TAG, "poll failed (%d in a row), got %d bytes", fails, n);
+            ESP_LOGW(TAG, "poll failed (%d in a row), got %d bytes, wifi rssi %d dBm", fails, n, wifi_.rssi());
             if (fails >= 2) publish_link(cs::Link::Error);
+            // Joined but nothing gets through: the access point has dropped our session without a
+            // word. Rejoining fixes it; the wait keeps a dead site from making us flap.
+            if (fails >= 3 && esp_timer_get_time() - last_rejoin_us > 30'000'000) {
+                last_rejoin_us = esp_timer_get_time();
+                wifi_.reconnect();
+                fails = 0;
+            }
         }
 
         // Quick while music is on, relaxed otherwise, and backing off while the network is struggling.
         int wait_ms = playing ? 4000 : 8000;
         if (fails) wait_ms = 2000 << (fails < 4 ? fails : 4);
-        vTaskDelay(pdMS_TO_TICKS(wait_ms));
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(wait_ms));  // a poke ends the wait early
     }
 }
 

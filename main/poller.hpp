@@ -6,6 +6,7 @@
 #include "deck.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "wifi.hpp"
 
 namespace dev {
@@ -29,6 +30,8 @@ public:
     void start();
     // Copies the latest news into out if anything changed since seq; returns whether it did.
     bool take(Snapshot& out, uint32_t seq);
+    // Cuts the wait short so the next poll happens now. Safe to call from any task.
+    void poke();
 
 private:
     static void entry(void* self);
@@ -39,6 +42,7 @@ private:
 
     Wifi& wifi_;
     SemaphoreHandle_t lock_;
+    TaskHandle_t task_ = nullptr;
     Snapshot snap_;
 };
 

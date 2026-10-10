@@ -45,6 +45,16 @@ int Wifi::seconds_down() const {
     return int((esp_timer_get_time() - down_since_us_) / 1'000'000);
 }
 
+void Wifi::reconnect() {
+    ESP_LOGW(TAG, "network went quiet, rejoining");
+    esp_wifi_disconnect();
+}
+
+int Wifi::rssi() const {
+    wifi_ap_record_t ap;
+    return esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? int(ap.rssi) : 0;
+}
+
 void Wifi::begin() {
     down_since_us_ = esp_timer_get_time();
     esp_netif_init();
@@ -73,6 +83,8 @@ void Wifi::begin() {
     ESP_ERROR_CHECK(esp_wifi_sta_enterprise_enable());
 
     ESP_ERROR_CHECK(esp_wifi_start());
+    // The display is always powered, and a sleeping radio is how a quiet session goes stale.
+    esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_LOGI(TAG, "joining %s", WIFI_SSID);
 }
 
