@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "rk/surface.hpp"
@@ -47,6 +48,18 @@ void Deck::set_art(const uint16_t* px, uint16_t accent) {
         has_art_ = false;
         accent_ = kHouseBlue;
     }
+    ++revision_;
+}
+
+void Deck::set_battery(int percent, bool charging) {
+    percent = percent < 0 ? -1 : std::min(percent, 100);
+    charging = percent >= 0 && charging;
+    // The gauge wobbles by a point or so; a repaint for that would be pure noise. The ends always show.
+    const bool both = percent >= 0 && battery_ >= 0;
+    if (both && charging == charging_ && std::abs(percent - battery_) < 2 && percent != 0 && percent != 100) return;
+    if (percent == battery_ && charging == charging_) return;
+    battery_ = percent;
+    charging_ = charging;
     ++revision_;
 }
 

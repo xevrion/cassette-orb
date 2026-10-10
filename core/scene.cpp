@@ -223,6 +223,29 @@ void Scene::paint_wifi(Surface& sf, const Deck& d) {
     fill_disc(sf, cx, cy, 3, lit);
 }
 
+// A small battery with a percentage, to the right of the Wi-Fi icon. Absent when running from
+// USB with no battery fitted. Charging shows a bolt over the cell.
+void Scene::paint_battery(Surface& sf, const Deck& d) {
+    if (d.battery() < 0) return;
+    const int pct = d.battery();
+    const uint16_t ink = d.charging() ? rgb565(60, 190, 110) : pct <= 15 ? rgb565(235, 85, 85) : pct <= 30 ? rgb565(235, 170, 50) : kWhite;
+    constexpr int x = 268, y = 424, w = 26, h = 14;  // the cell; a nub on the right side
+    sf.fill_rect(x, y, w, h, kGrey);
+    sf.fill_rect(x + 2, y + 2, w - 4, h - 4, kBlack);
+    sf.fill_rect(x + w, y + 4, 3, h - 8, kGrey);
+    const int inner = w - 6;
+    const int fill = pct <= 0 ? 0 : std::max(2, inner * pct / 100);
+    sf.fill_rect(x + 3, y + 3, fill, h - 6, ink);
+    if (d.charging()) {
+        thick_line(sf, x + 14, y + 2, x + 10, y + 7, 2, kWhite);
+        thick_line(sf, x + 10, y + 7, x + 16, y + 7, 2, kWhite);
+        thick_line(sf, x + 16, y + 7, x + 12, y + 12, 2, kWhite);
+    }
+    char text[16];
+    std::snprintf(text, sizeof text, "%d%%", pct);
+    rk::draw_text(sf, x + w + 8, y + (h - rk::text_height(1)) / 2, text, 1, ink);
+}
+
 void Scene::repaint_all(Surface& sf, const Deck& d) {
     sf.fill_rect(0, 0, kScreen, kScreen, kBlack);
     paint_ring(sf, d);
@@ -231,6 +254,7 @@ void Scene::repaint_all(Surface& sf, const Deck& d) {
     for (int i = 0; i < kLines; ++i) paint_line(sf, d, i);
     paint_footer(sf, d);
     paint_wifi(sf, d);
+    paint_battery(sf, d);
 }
 
 void Scene::draw(Surface& sf, const Deck& d) {

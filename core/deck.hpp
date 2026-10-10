@@ -24,7 +24,11 @@ public:
     // The cover for the current song, arriving a moment after its metadata. null removes it.
     void set_art(const uint16_t* rgb565_square, uint16_t accent);
     void update(float dt);
+    // percent 0..100, or -1 when no battery is fitted (running from USB, nothing to show).
+    void set_battery(int percent, bool charging);
 
+    int battery() const { return battery_; }
+    bool charging() const { return charging_; }
     const Track& track() const { return track_; }
     Link link() const { return link_; }
     bool playing() const { return track_.known && track_.playing; }
@@ -45,6 +49,8 @@ private:
     std::vector<uint16_t> art_;
     bool has_art_ = false;
     uint16_t accent_;
+    int battery_ = -1;
+    bool charging_ = false;
     float energy_ = 0.0f;  // eases between 0 (paused) and 1 (playing)
     float phase_ = 0.0f;
     float seconds_ = 0.0f;

@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 #include "poller.hpp"
+#include "rk/battery.hpp"
 #include "rk/display_lock.hpp"
 #include "rk/gesture.hpp"
 #include "rk/panel.hpp"
@@ -23,6 +24,7 @@ constexpr int kBright = 70;       // percent while music is on
 constexpr int kDim = 10;          // percent after the music has been off for a while
 constexpr int kDimAfterS = 90;
 constexpr int kTouchWakeS = 30;   // a tap keeps the screen bright this long
+constexpr int kBatteryEvery = 600;  // frames between battery reads, about ten seconds
 constexpr int kBlinkFrames = 10;  // full brightness for this many frames when a refresh is asked for
 
 // How many times LVGL actually refreshed the panel, and how long each took, so "smooth" is a number.
@@ -81,6 +83,8 @@ extern "C" void app_main() {
     int level = kBright;
     int frame = 0;
     lv_indev_t* touch = bsp_display_get_input_dev();
+    rk::Battery battery;
+    const bool have_battery = battery.begin();
     rk::Gesture gesture;
     int awake_frames = 0, blink = 0;
     int64_t draw_sum = 0, draw_max = 0;
@@ -138,6 +142,16 @@ extern "C" void app_main() {
             }
         }
 #endif
+
+        if (have_battery && frame % kBatteryEvery == 1) {
+            int percent = 0;
+            bool charging = false;
+            switch (battery.read(percent, charging)) {
+            case rk::Battery::Reading::Level: deck.set_battery(percent, charging); break;
+            case rk::Battery::Reading::NoBattery: deck.set_battery(-1, false); break;
+            case rk::Battery::Reading::Error: break;  // keep what is on screen
+            }
+        }
 
         const int64_t now = esp_timer_get_time();
         float dt = float(now - last) / 1e6f;

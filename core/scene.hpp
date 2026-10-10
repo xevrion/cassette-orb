@@ -26,6 +26,7 @@ private:
     void paint_line(rk::Surface& sf, const Deck& d, int line);
     void paint_footer(rk::Surface& sf, const Deck& d);
     void paint_wifi(rk::Surface& sf, const Deck& d);
+    void paint_battery(rk::Surface& sf, const Deck& d);
 
     uint32_t revision_ = 0;
     int offset_[kLines] = {-1, -1, -1};

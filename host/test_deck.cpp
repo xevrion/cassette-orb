@@ -93,6 +93,33 @@ static void test_revisions() {
     CHECK(d.revision() > before, "a new link state needs a repaint");
 }
 
+static void test_battery() {
+    Deck d;
+    CHECK(d.battery() == -1 && !d.charging(), "no battery until one is reported");
+    uint32_t rev = d.revision();
+    d.set_battery(-1, false);
+    CHECK(d.revision() == rev, "still no battery is not news");
+    d.set_battery(80, false);
+    CHECK(d.battery() == 80 && d.revision() > rev, "a battery appears");
+    rev = d.revision();
+    d.set_battery(79, false);
+    CHECK(d.battery() == 80 && d.revision() == rev, "a one point wobble is ignored");
+    d.set_battery(77, false);
+    CHECK(d.battery() == 77 && d.revision() > rev, "a real drop shows");
+    rev = d.revision();
+    d.set_battery(77, true);
+    CHECK(d.charging() && d.revision() > rev, "plugging in shows");
+    d.set_battery(150, true);
+    CHECK(d.battery() == 100, "clamped to 100");
+    rev = d.revision();
+    d.set_battery(99, true);
+    CHECK(d.battery() == 100 && d.revision() == rev, "99 against 100 is a wobble");
+    d.set_battery(0, false);
+    CHECK(d.battery() == 0, "empty shows");
+    d.set_battery(-1, true);
+    CHECK(d.battery() == -1 && !d.charging(), "unplugging the battery hides it, and cannot be charging");
+}
+
 static void test_art_arrives_late() {
     Deck d;
     d.set_track(song("A", true, 1));
@@ -167,6 +194,7 @@ int main() {
     test_bars_settle_when_paused();
     test_bars_ease_in();
     test_revisions();
+    test_battery();
     test_art_arrives_late();
     test_text_restarts_for_a_new_song();
     test_marquee();

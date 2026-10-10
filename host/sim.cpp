@@ -202,6 +202,7 @@ int run_shots(const std::string& dir) {
     sim.deck.set_link(Link::Online);
     run(0.3f);
     shot("nothing_playing");
+    sim.deck.set_battery(64, false);
     sim.play(1, true);
     run(2.0f);
     shot("playing");
@@ -212,9 +213,13 @@ int run_shots(const std::string& dir) {
     shot("long_text_start");
     run(4.0f);
     shot("long_text_scrolled");
+    sim.deck.set_battery(12, false);
     sim.play(3, false);
     run(4.0f);
     shot("paused");
+    sim.deck.set_battery(55, true);
+    run(0.2f);
+    shot("charging");
     sim.play(0, true);
     run(2.0f);
     shot("another_song");

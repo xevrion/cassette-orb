@@ -126,6 +126,10 @@ static void test_incremental_matches_fresh() {
         if (frame == 1400) deck.set_link(Link::Error);
         if (frame == 1450) deck.set_link(Link::Online);
         if (frame == 1500) deck.set_track(Track());
+        if (frame == 200) deck.set_battery(64, false);
+        if (frame == 700) deck.set_battery(60, true);
+        if (frame == 1000) deck.set_battery(8, false);
+        if (frame == 1600) deck.set_battery(-1, false);
         deck.update(kDt);
         scene.draw(live_sf, deck);
 
@@ -252,6 +256,28 @@ static void test_wifi_icon() {
     CHECK(down[top * kScreen + 233] != down[dot * kScreen + 233], "with no network only the dot is lit, in red");
     CHECK(down[dot * kScreen + 233] != online[dot * kScreen + 233], "red dot against green dot");
     CHECK(brightness(down, 233, top) > 0, "the faint outline is still there");
+}
+
+// A battery gauge shows only when a battery is fitted, and its fill follows the percentage.
+static void test_battery_gauge() {
+    auto gauge = [](int pct, bool charging) {
+        Deck d;
+        d.set_link(Link::Online);
+        d.set_battery(pct, charging);
+        return paint(d, 0.2f);
+    };
+    const auto none = gauge(-1, false), full = gauge(100, false), half = gauge(50, false), low = gauge(10, false), empty = gauge(0, false), plug = gauge(50, true);
+    // The cell is at x 268..293, y 424..437; its inside runs from x 271 to 290 at y 430.
+    auto at = [](const std::vector<uint16_t>& px, int x) { return px[430 * kScreen + x]; };
+    CHECK(at(none, 280) == 0 && at(none, 270) == 0, "no battery, nothing drawn");
+    CHECK(at(full, 289) != 0 && at(full, 272) != 0, "a full cell is filled end to end");
+    CHECK(at(half, 272) != 0 && at(half, 289) == 0, "half a cell is filled on the left only");
+    CHECK(at(low, 272) != 0 && at(low, 280) == 0, "a low cell is a sliver");
+    CHECK(at(empty, 272) == 0, "an empty cell has no fill");
+    CHECK(at(half, 272) != at(low, 272), "low is drawn in a warning colour");
+    int first = 0;
+    CHECK(differing(half, plug, &first) > 10, "charging looks different from running on battery");
+    CHECK(differing(none, half, &first) > 100, "and the gauge adds a visible number");
 }
 
 // "Quick" as a number. While a song plays, each frame touches only the equalizer and any line that
@@ -381,6 +407,7 @@ int main() {
     test_glow_and_ring();
     test_each_state_looks_different();
     test_wifi_icon();
+    test_battery_gauge();
     test_playing_frames_are_tiny();
     test_short_title_only_moves_the_bars();
     test_paused_is_silent();
